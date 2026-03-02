@@ -14,6 +14,7 @@ var (
 )
 
 func ConectaComBancoDeDados() {
+	
 	endereco := os.Getenv("DB_HOST")
 	usuario := os.Getenv("DB_USER")
 	senha := os.Getenv("DB_PASSWORD")
