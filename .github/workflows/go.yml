@@ -5,27 +5,41 @@ name: Integração Continua
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
-
   ci:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.22'
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.22"
 
-    - name: Inicia banco
-      run: docker-compose up -d postgres
+      - name: Inicia banco
+        run: |
+          docker compose up -d postgres
+          sleep 3
+          docker compose ps
+          docker compose logs postgres
 
-    - name: Lint
-      run: docker run --rm -itv $(CURDIR):/app -w /app golangci/golangci-lint golangci-lint run controllers/ database/ models/ routes/
+      - name: Aguarda banco ficar pronto
+        run: |
+          for i in $(seq 1 15); do
+            docker compose exec -T postgres pg_isready -U ${{ secrets.DB_USER }} -d ${{ secrets.DB_NAME }} && echo "Postgres pronto!" && break
+            echo "Tentativa $i/15, aguardando 2s..."
+            sleep 2
+          done
 
-    - name: Test
-      run: go test -v main_test.go
+      - name: Lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.59
+          args: controllers/ database/ models/ routes/
+
+      - name: Test
+        run: DB_HOST=${{ secrets.DB_HOST }} DB_PASSWORD=${{ secrets.DB_PASSWORD }} DB_USER=${{ secrets.DB_USER }} DB_NAME=${{ secrets.DB_NAME }} DB_PORT=${{ secrets.DB_PORT }} go test -v main_test.go
